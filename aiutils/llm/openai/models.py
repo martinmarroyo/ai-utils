@@ -1,4 +1,4 @@
-from aiutils.llm.base.models import ChatMessage
+from aiutils.llm.base.messages import ChatMessage
 from aiutils.llm.base.models import AIBaseModel
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, Literal
