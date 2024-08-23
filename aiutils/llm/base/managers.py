@@ -28,9 +28,13 @@ class ChatManager:
   def __exit__(self, exc_type, exc_value, traceback):
     self._session.close()
 
-  def chat(self, messages: List[ChatMessage]):
+  def chat(self, messages: List[ChatMessage] | str):
       if not self._session:
         self._session = Session()
+
+      if isinstance(messages, str):
+        messages = [ChatMessage(role="user", content=messages)]
+
       retries = 0
       penalty_wait = 0
       while retries < self._max_retries:
@@ -53,9 +57,12 @@ class ChatManager:
   async def __aexit__(self, exc_type, exc_value, traceback):
     await self._async_session.close()
   
-  async def async_chat(self, messages: List[ChatMessage]):
+  async def async_chat(self, messages: List[ChatMessage] | str):
       if not self._async_session:
         self._async_session = ClientSession()
+
+      if isinstance(messages, str):
+        messages = [ChatMessage(role="user", content=messages)]
 
       retries = 0
       penalty_wait = 0
