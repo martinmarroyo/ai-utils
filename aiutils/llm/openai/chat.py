@@ -205,3 +205,68 @@ class OpenAIChat(ChatManager, BaseOpenAIChat):
                               max_tokens=max_tokens,
                               headers=headers)
     ChatManager.__init__(self, llm=self)
+
+
+class SimpleOpenAIChatbot(OpenAIChat):
+  def __init__(self, 
+               chat_model: AIBaseModel | str = GPT4oMini,
+               api_key: str = None,
+               endpoint: str = "https://api.openai.com/v1/chat/completions",
+               stream: bool = False,
+               stream_options: Dict[str, Any] = None,
+               system_prompt: str = "You are a helpful assistant",
+               response_format: Optional[Dict[str, Any] | BaseModel] = None,
+               temperature: float = 0.0,
+               logprobs: bool = False,
+               top_p: float = None,
+               seed: int = None,
+               max_tokens: int = None,
+               headers: Dict[str, str] = None,
+               message_buffer_size: int = 5):
+    super().__init__(chat_model=chat_model,
+                    api_key=api_key,
+                    endpoint=endpoint,
+                    stream=stream,
+                    stream_options=stream_options,
+                    system_prompt=system_prompt,
+                    response_format=response_format,
+                    temperature=temperature,
+                    logprobs=logprobs,
+                    top_p=top_p,
+                    seed=seed,
+                    max_tokens=max_tokens,
+                    headers=headers)
+    
+    self.message_history = [
+        ChatMessage(role="system", 
+                    content=system_prompt or self.system_prompt)
+    ]
+    self.MESSAGE_BUFFER_SIZE = message_buffer_size
+
+  def _simple_message_compaction(self):
+      print("Compacting messages...")
+      raw_messages = [m.content for m in self.message_history]
+      summary = self.chat("Summarize the following conversation in one to "
+                            f"two paragraphs:\n\n{raw_messages}")
+      compacted_history = [
+          self.message_history[0], 
+          ChatMessage(role = "assistant", content=summary.response)]
+      print("Compaction completed!")
+      self.message_history = compacted_history
+
+  def conversation(self):
+      while True:
+        with self as llm:
+          question = input("Ask me anything!\t")
+          if question.lower() in ("quit", "exit", "bye", "/q"):
+            print("Goodbye!")
+            break
+
+          if len(self.message_history) >= self.MESSAGE_BUFFER_SIZE:
+            self._simple_message_compaction()
+
+          self.message_history.append(format_for_chat(question))
+          result = llm.chat(self.message_history)
+          print(result.response, end=f"\n\n{'-' * 40}\n\n")
+          self.message_history.append(ChatMessage(role="assistant", 
+                                          content=result.response))
