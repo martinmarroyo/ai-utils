@@ -16,3 +16,6 @@ class ChatResponse(BaseModel):
   model: str = Field(..., description="The model that generated the response.")
   usage: Optional[Dict[str, float]] = Field(None, description="Token usage and cost incurred for the request.")
   response: str | BaseModel = Field(..., description="The response from the model.")
+
+def format_for_chat(input_message: str, role: str = "user") -> ChatMessage:
+  return ChatMessage(role=role, content=input_message)
