@@ -4,13 +4,22 @@ from aiutils.llm.base.messages import ChatMessage
 from requests import Session
 from aiohttp import ClientSession
 from typing import List
+import asyncio
+import time
 
 class ChatManager:
   """A class for managing calls to an AI Chat model."""
-  def __init__(self, llm: BaseAIChat):
+  def __init__(self, 
+               llm: BaseAIChat, 
+               max_retries: int = 10, 
+               delay: int = 1, 
+               penalty: int = 2):
     self.llm = llm
     self._session = None
     self._async_session = None
+    self._max_retries = max_retries
+    self._delay = delay
+    self._penalty = penalty
   
   def __enter__(self):
     self._session = Session()
@@ -22,8 +31,20 @@ class ChatManager:
   def chat(self, messages: List[ChatMessage]):
       if not self._session:
         self._session = Session()
-      response = self.llm.send_prompt(self._session, messages)
-      return response
+      retries = 0
+      penalty_wait = 0
+      while retries < self._max_retries:
+        try:
+          response = self.llm.send_prompt(self._session, messages)
+          return response
+        except Exception as ex:
+          retries += 1
+          if retries == self._max_retries:
+            print("Retries exhausted. Please check your rate limits " 
+                  "and try again later.")
+            raise ex
+          time.sleep(self._delay + penalty_wait)
+          penalty_wait += self._penalty
 
   async def __aenter__(self):
     self._async_session = ClientSession()
@@ -35,8 +56,21 @@ class ChatManager:
   async def async_chat(self, messages: List[ChatMessage]):
       if not self._async_session:
         self._async_session = ClientSession()
-      response = await self.llm.async_send_prompt(self._async_session, messages)
-      return response
+
+      retries = 0
+      penalty_wait = 0
+      while retries < self._max_retries:
+        try:
+          response = await self.llm.async_send_prompt(self._async_session, messages)
+          return response
+        except Exception as ex:
+          retries += 1
+          if retries == self._max_retries:
+            print("Retries exhausted. Please check your rate limits " 
+                  "and try again later.")
+            raise ex
+          await asyncio.sleep(self._delay + penalty_wait)
+          penalty_wait += self._penalty
 
   @property
   def session(self):
@@ -45,3 +79,27 @@ class ChatManager:
   @property
   def async_session(self):
     return self._async_session
+
+  @property
+  def max_retries(self):
+    return self._max_retries
+
+  @max_retries.setter
+  def max_retries(self, value):
+    self._max_retries = value
+    
+  @property
+  def delay(self):
+    return self._delay
+
+  @delay.setter
+  def delay(self, value):
+    self._delay = value
+
+  @property
+  def penalty(self):
+    return self._penalty
+
+  @penalty.setter
+  def penalty(self, value):
+    self._penalty = value 
