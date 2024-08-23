@@ -45,7 +45,7 @@ class ChatManager:
           retries += 1
           if retries == self._max_retries:
             print("Retries exhausted. Please check your rate limits " 
-                  "and try again later.")
+                  f"and try again later.\n\nError: {str(ex)}")
             raise ex
           time.sleep(self._delay + penalty_wait)
           penalty_wait += self._penalty
@@ -74,7 +74,7 @@ class ChatManager:
           retries += 1
           if retries == self._max_retries:
             print("Retries exhausted. Please check your rate limits " 
-                  "and try again later.")
+                  f"and try again later.\n\nError: {str(ex)}")
             raise ex
           await asyncio.sleep(self._delay + penalty_wait)
           penalty_wait += self._penalty
