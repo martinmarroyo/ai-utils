@@ -1,6 +1,6 @@
 """A collection of interfaces for tools and connectors"""
-from aiutils.llm.base.models import ChatResponse
-from aiutils.llm.base.models import ChatMessage
+from aiutils.llm.base.messages import ChatResponse
+from aiutils.llm.base.messages import ChatMessage
 from aiutils.llm.base.models import AIBaseModel
 from abc import ABC, abstractmethod
 from typing import List
