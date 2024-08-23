@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="ai_utils",
-    version="0.0.2",
+    name="aiutils",
+    version="0.0.4",
     description="A set of utility functions for AI projects",
     author="Martin Arroyo",
     author_email="martinm.arroyo7@gmail.com",

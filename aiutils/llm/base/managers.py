@@ -1,6 +1,6 @@
 """A collection of classes and methods that are meant to manage other processes"""
-from llm.base.models import BaseAIChat
-from llm.base.models import ChatMessage
+from aiutils.llm.base.interfaces import BaseAIChat
+from aiutils.llm.base.models import ChatMessage
 from requests import Session
 from aiohttp import ClientSession
 from typing import List

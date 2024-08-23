@@ -1,11 +1,13 @@
-from llm.base.models import AIBaseModel
-from llm.base.models import BaseAIChat
-from llm.base.models import ChatResponse
-from llm.base.models import ChatMessage
-from llm.openai.models import OpenAIChatRequest
-from llm.openai.models import GPT4oMini
+from aiutils.llm.base.models import AIBaseModel
+from aiutils.llm.base.interfaces import BaseAIChat
+from aiutils.llm.base.models import ChatResponse
+from aiutils.llm.base.models import ChatMessage
+from aiutils.llm.base.managers import ChatManager
+from aiutils.llm.openai.models import OpenAIChatRequest
+from aiutils.llm.openai.models import GPT4oMini
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, Literal
+from aiohttp import ClientSession
 import os
 import requests
 import json
@@ -61,7 +63,7 @@ class BaseOpenAIChat(BaseAIChat):
     return result
 
   async def async_send_prompt(self, 
-                        session: aiohttp.ClientSession, 
+                        session: ClientSession, 
                         messages: List[ChatMessage], 
                         sys_prompt: str = None) -> ChatResponse:
     request = self._prepare_request(messages=messages, sys_prompt=sys_prompt)
