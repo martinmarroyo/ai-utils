@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="aiutils",
-    version="0.0.4",
+    version="0.0.5",
     description="A set of utility functions for AI projects",
     author="Martin Arroyo",
     author_email="martinm.arroyo7@gmail.com",
