@@ -1,30 +1,17 @@
-from llm.base.base_models import ChatMessage
+from llm.base.models import ChatMessage
+from llm.base.models import AIBaseModel
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, Literal
 
-class OpenAIModel(BaseModel):
-  id: str = Field(..., description="The ID of the model")
-  input_token_price: float = Field(..., description="The price per input token")
-  output_token_price: float = Field(..., description="The price per output token")
-
-class GPT4oMini(OpenAIModel):
+class GPT4oMini(AIBaseModel):
   id: Literal["gpt-4o-mini"] = "gpt-4o-mini"
   input_token_price: float = 0.15 / (10 ** 6)
   output_token_price: float = 0.60 / (10 ** 6)
 
-class GPT4o(OpenAIModel):
-  id: Literal["gpt-4o"] 
+class GPT4o(AIBaseModel):
+  id: Literal["gpt-4o"]
   input_token_price: float = 5.00 / (10 ** 6)
   output_token_price: float = 15.00 / (10 ** 6)
-
-
-
-  @classmethod
-  def from_dict(cls, message_dict: Dict[str, Any]) -> "ChatMessage":
-    return cls(**message_dict)
-
-  def to_dict(self) -> Dict[str, Any]:
-    return self.dict()
 
 class OpenAIChatRequest(BaseModel):
   model: str = Field(..., description="The model to use for the chat")

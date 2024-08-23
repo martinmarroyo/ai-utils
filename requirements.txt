@@ -1,2 +1,4 @@
 rank_bm25
 pydantic
+aiohttp
+requests
