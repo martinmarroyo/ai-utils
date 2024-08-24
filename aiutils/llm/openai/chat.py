@@ -67,7 +67,7 @@ class BaseOpenAIChat(BaseAIChat):
       return result
     except (HTTPError, Timeout, RequestException) as ex:
       print(f"Request failed with error: {response.text}")
-      print(f"Response type: {type(response)}\nResponse: {response}")
+      print(f"Request type: {type(response)}\nRequest: {response}")
       raise ex
     except Exception as ex:
       print(f"An unexpected error occurred: {str(ex)}")
