@@ -1,16 +1,18 @@
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
+from pydantic.functional_validators import AfterValidator
+from typing import Dict, Any, Optional, Annotated
+import json
 
 class ChatMessage(BaseModel):
   role: str = Field(..., description="The role of the message sender")
-  content: str = Field(..., description="The content of the message")
+  content: Annotated[str, AfterValidator(json.dumps)] = Field(..., description="The content of the message")
 
   @classmethod
   def from_dict(cls, message_dict: Dict[str, Any]) -> "ChatMessage":
     return cls(**message_dict)
 
   def to_dict(self) -> Dict[str, Any]:
-    return self.dict()
+    return self.model_dump()
   
 class ChatResponse(BaseModel):
   model: str = Field(..., description="The model that generated the response.")

@@ -1,5 +1,6 @@
 from aiutils.llm.base.models import AIBaseModel
 from aiutils.llm.base.interfaces import BaseAIChat
+from aiutils.llm.base.messages import format_for_chat
 from aiutils.llm.base.messages import ChatResponse
 from aiutils.llm.base.messages import ChatMessage
 from aiutils.llm.base.managers import ChatManager
@@ -13,7 +14,6 @@ from typing import List, Dict, Any, Optional, Literal
 from aiohttp import ClientSession
 import os
 import requests
-import json
 
 class BaseOpenAIChat(BaseAIChat):
   """A class for interacting with the OpenAI Chat API."""
@@ -98,6 +98,29 @@ class BaseOpenAIChat(BaseAIChat):
     except Exception as ex:
       print(f"An unexpected exception occurred: {str(ex)}")
       raise ex
+    
+  def _prepare_request(self, messages: List[ChatMessage], sys_prompt: str = None):
+    """Prepare the request to the OpenAI API."""
+    # Configure output format
+    output_format = self.response_format
+    if issubclass(self._check_output_format(), BaseModel):
+        output_format = self._structure_model_schema()
+    # Set up and send a synchronous request
+    request = OpenAIChatRequest(
+      model=self.model_id,
+      messages=[
+        ChatMessage(role="system", content=sys_prompt or self.system_prompt),
+        *messages
+      ],
+      temperature=self.temperature,
+      max_tokens=self.max_tokens,
+      top_p=self.top_p,
+      response_format=output_format,
+      seed=self.seed,
+      logprobs=self.logprobs
+    ).model_dump_json()
+
+    return request
 
   def _prepare_response(self, response: Dict[str, Any]) -> ChatResponse:
     """Prepare the response from the OpenAI API."""
@@ -122,29 +145,6 @@ class BaseOpenAIChat(BaseAIChat):
       "Response format must be a subclass of `BaseModel` or a dictionary."
       return BaseModel
     return dict
-
-  def _prepare_request(self, messages: List[ChatMessage], sys_prompt: str = None):
-    """Prepare the request to the OpenAI API."""
-    # Configure output format
-    output_format = self.response_format
-    if issubclass(self._check_output_format(), BaseModel):
-        output_format = self._structure_model_schema()
-    # Set up and send a synchronous request
-    request = OpenAIChatRequest(
-      model=self.model_id,
-      messages=[
-        ChatMessage(role="system", content=sys_prompt or self.system_prompt),
-        *messages
-      ],
-      temperature=self.temperature,
-      max_tokens=self.max_tokens,
-      top_p=self.top_p,
-      response_format=output_format,
-      seed=self.seed,
-      logprobs=self.logprobs
-    ).model_dump_json()
-
-    return request
 
   def _structure_model_schema(self) -> Dict[str, Any]:
     """Structure the model schema for the response."""
@@ -188,10 +188,6 @@ class BaseOpenAIChat(BaseAIChat):
       "Response format type must be of `json_schema` for structured output."
     
     self.response_format = model
-
-
-def format_for_chat(input_message: str, role: str = "user") -> ChatMessage:
-  return ChatMessage(role=role, content=input_message)
 
 
 class OpenAIChat(ChatManager, BaseOpenAIChat):

@@ -38,7 +38,7 @@ class ChatManager:
         self._session = Session()
 
       if isinstance(messages, str):
-        messages = [ChatMessage(role="user", content=json.dumps(messages))]
+        messages = [ChatMessage(role="user", content=messages)]
 
       retries = 0
       penalty_wait = 0
@@ -71,7 +71,7 @@ class ChatManager:
         self._async_session = ClientSession()
 
       if isinstance(messages, str):
-        messages = [ChatMessage(role="user", content=json.dumps(messages))]
+        messages = [ChatMessage(role="user", content=messages)]
 
       retries = 0
       penalty_wait = 0
