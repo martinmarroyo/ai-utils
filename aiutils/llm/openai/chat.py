@@ -67,9 +67,11 @@ class BaseOpenAIChat(BaseAIChat):
       return result
     except (HTTPError, Timeout, RequestException) as ex:
       print(f"Request failed with error: {response.text}")
+      print(f"Response type: {type(response)}\nResponse: {response}")
       raise ex
     except Exception as ex:
       print(f"An unexpected error occurred: {response.text}")
+      print(f"Response type: {type(response)}\nResponse: {response}")
       raise ex
 
   async def async_send_prompt(self,
@@ -91,6 +93,11 @@ class BaseOpenAIChat(BaseAIChat):
     except (ClientResponseError, ClientTimeout, ClientError) as ex:
       error_msg = await response.text()
       print(f"Request failed with error: {error_msg}")
+      print(f"Response type: {type(response)}\nResponse: {response}")
+      raise ex
+    
+    except Exception as ex:
+      print(f"An unexpected exception occurred: {str(ex)}")
       raise ex
 
   def _prepare_response(self, response: Dict[str, Any]) -> ChatResponse:
