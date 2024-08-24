@@ -5,6 +5,9 @@ from aiutils.llm.base.messages import ChatMessage
 from aiutils.llm.base.managers import ChatManager
 from aiutils.llm.openai.models import OpenAIChatRequest
 from aiutils.llm.openai.models import GPT4oMini
+from requests.exceptions import HTTPError, Timeout, RequestException
+from aiohttp.client_exceptions import ClientResponseError, ClientError
+from aiohttp.client import ClientTimeout
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, Literal
 from aiohttp import ClientSession
@@ -45,39 +48,50 @@ class BaseOpenAIChat(BaseAIChat):
     self.endpoint: str = endpoint
     self.logprobs: bool = logprobs
 
-
-  def send_prompt(self, 
+  def send_prompt(self,
                   session: requests.Session,
                   messages: List[ChatMessage],
                   sys_prompt: str = None) -> ChatResponse:
+    """Sends a synchronous prompt to the OpenAI API Chat endpoint."""
     request = self._prepare_request(messages=messages, sys_prompt=sys_prompt)
-    response = session.post(
-      self.endpoint,
-      headers=self.headers,
-      data=request
-    )
-    # Check response status and send results back to user
-    response.raise_for_status()
-    result = self._prepare_response(response.json())
+    try:
+      response = session.post(
+        self.endpoint,
+        headers=self.headers,
+        data=request
+      )
+      # Check response status and send results back to user
+      response.raise_for_status()
+      result = self._prepare_response(response.json())
 
-    return result
+      return result
+    except (HTTPError, Timeout, RequestException) as ex:
+      print(f"Request failed with error: {response.text}")
+      raise ex
+    except Exception as ex:
+      print(f"An unexpected error occurred: {response.text}")
+      raise ex
 
-  async def async_send_prompt(self, 
-                        session: ClientSession, 
-                        messages: List[ChatMessage], 
+  async def async_send_prompt(self,
+                        session: ClientSession,
+                        messages: List[ChatMessage],
                         sys_prompt: str = None) -> ChatResponse:
-    request = self._prepare_request(messages=messages, sys_prompt=sys_prompt)
-    response = await session.post(
-      self.endpoint,
-      headers=self.headers,
-      data=request
-    )
-    if response.status != 200:
-      raise Exception(f"Request failed with status code {response.status}")
-    
-    result = self._prepare_response(await response.json())
+    """Sends a prompt to the OpenAI API asynchronously and returns the response."""
+    try:
+      request = self._prepare_request(messages=messages, sys_prompt=sys_prompt)
+      response = await session.post(
+        self.endpoint,
+        headers=self.headers,
+        data=request
+      )
+      response.raise_for_status()
+      result = self._prepare_response(await response.json())
+      return result
 
-    return result
+    except (ClientResponseError, ClientTimeout, ClientError) as ex:
+      error_msg = await response.text()
+      print(f"Request failed with error: {error_msg}")
+      raise ex
 
   def _prepare_response(self, response: Dict[str, Any]) -> ChatResponse:
     """Prepare the response from the OpenAI API."""

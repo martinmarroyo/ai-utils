@@ -1,6 +1,9 @@
 """A collection of classes and methods that are meant to manage other processes"""
 from aiutils.llm.base.interfaces import BaseAIChat
 from aiutils.llm.base.messages import ChatMessage
+from requests.exceptions import HTTPError, Timeout, RequestException
+from aiohttp.client_exceptions import ClientResponseError, ClientError
+from aiohttp.client import ClientTimeout
 from requests import Session
 from aiohttp import ClientSession
 from typing import List
@@ -29,6 +32,7 @@ class ChatManager:
     self._session.close()
 
   def chat(self, messages: List[ChatMessage] | str):
+      """Synchronous chat with the given LLM"""
       if not self._session:
         self._session = Session()
 
@@ -41,14 +45,17 @@ class ChatManager:
         try:
           response = self.llm.send_prompt(self._session, messages)
           return response
-        except Exception as ex:
+        except (HTTPError, Timeout, RequestException) as req_err:
           retries += 1
           if retries == self._max_retries:
-            print("Retries exhausted. Please check your rate limits " 
-                  f"and try again later.\n\nError: {str(ex)}")
-            raise ex
+            print("Retries exhausted. Please check your rate limits "
+                  "and try again later.")
+            raise req_err
           time.sleep(self._delay + penalty_wait)
           penalty_wait += self._penalty
+        except Exception as ex:
+          print(f"An unexpected error occurred: {str(ex)}")
+          raise ex
 
   async def __aenter__(self):
     self._async_session = ClientSession()
@@ -58,6 +65,7 @@ class ChatManager:
     await self._async_session.close()
   
   async def async_chat(self, messages: List[ChatMessage] | str):
+      """Asynchronous chat with the given LLM"""
       if not self._async_session:
         self._async_session = ClientSession()
 
@@ -70,11 +78,11 @@ class ChatManager:
         try:
           response = await self.llm.async_send_prompt(self._async_session, messages)
           return response
-        except Exception as ex:
+        except (ClientResponseError, ClientTimeout, ClientError) as ex:
           retries += 1
           if retries == self._max_retries:
-            print("Retries exhausted. Please check your rate limits " 
-                  f"and try again later.\n\nError: {str(ex)}")
+            print("Retries exhausted. Please check your rate limits "
+                  "and try again later.")
             raise ex
           await asyncio.sleep(self._delay + penalty_wait)
           penalty_wait += self._penalty
