@@ -9,6 +9,7 @@ from aiohttp import ClientSession
 from typing import List
 import asyncio
 import time
+import json
 
 class ChatManager:
   """A class for managing calls to an AI Chat model."""
@@ -37,7 +38,7 @@ class ChatManager:
         self._session = Session()
 
       if isinstance(messages, str):
-        messages = [ChatMessage(role="user", content=messages)]
+        messages = [ChatMessage(role="user", content=json.dumps(messages))]
 
       retries = 0
       penalty_wait = 0
@@ -70,7 +71,7 @@ class ChatManager:
         self._async_session = ClientSession()
 
       if isinstance(messages, str):
-        messages = [ChatMessage(role="user", content=messages)]
+        messages = [ChatMessage(role="user", content=json.dumps(messages))]
 
       retries = 0
       penalty_wait = 0
