@@ -6,14 +6,14 @@ from aiutils.llm.base.messages import ChatMessage
 from aiutils.llm.base.managers import ChatManager
 from aiutils.llm.openai.models import OpenAIChatRequest
 from aiutils.llm.openai.models import GPT4oMini
+from aiutils.llm.openai.models import map_to_model
 from requests.exceptions import HTTPError, Timeout, RequestException
-from aiohttp.client_exceptions import ClientResponseError, ClientError
-from aiohttp.client import ClientTimeout
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, Literal
 from aiohttp import ClientSession
 import os
 import requests
+import aiohttp
 
 class BaseOpenAIChat(BaseAIChat):
   """A class for interacting with the OpenAI Chat API."""
@@ -32,7 +32,7 @@ class BaseOpenAIChat(BaseAIChat):
                max_tokens: int = None,
                headers: Dict[str, str] = None):
     self.api_key: str = os.environ.get("OPENAI_API_KEY", api_key)
-    self.chat_model: str | AIBaseModel = chat_model()
+    self.chat_model: str | AIBaseModel = map_to_model(chat_model)()
     self.model_id: str = (self.chat_model.id
                           if isinstance(self.chat_model, AIBaseModel)
                           else chat_model)
@@ -89,7 +89,7 @@ class BaseOpenAIChat(BaseAIChat):
       result = self._prepare_response(await response.json())
       return result
 
-    except (ClientResponseError, ClientTimeout, ClientError) as ex:
+    except (aiohttp.ClientResponseError, aiohttp.ClientTimeout, aiohttp.ClientError) as ex:
       error_msg = await response.text()
       print(f"Request failed with error: {error_msg}")
       print(f"Request type: {type(request)}\nRequest: {request}")
