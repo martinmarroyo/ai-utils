@@ -6,12 +6,15 @@ from aiutils.llm.base.messages import ChatMessage
 from aiutils.llm.base.managers import ChatManager
 from aiutils.llm.openai.models import OpenAIChatRequest
 from aiutils.llm.openai.models import GPT4oMini
-from aiutils.llm.openai.models import map_to_model
+from aiutils.llm.openai.models import map_to_price_model
 from requests.exceptions import HTTPError, Timeout, RequestException
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, Literal
 from aiohttp import ClientSession
+from io import StringIO
 import os
+import json
+import time
 import requests
 import aiohttp
 
@@ -22,7 +25,6 @@ class BaseOpenAIChat(BaseAIChat):
                api_key: str = None,
                endpoint: str = "https://api.openai.com/v1/chat/completions",
                stream: bool = False,
-               stream_options: Dict[str, Any] = None,
                system_prompt: str = "You are a helpful assistant",
                response_format: Optional[Dict[str, Any] | BaseModel] = None,
                temperature: float = 0.0,
@@ -32,7 +34,7 @@ class BaseOpenAIChat(BaseAIChat):
                max_tokens: int = None,
                headers: Dict[str, str] = None):
     self.api_key: str = os.environ.get("OPENAI_API_KEY", api_key)
-    self.chat_model: str | AIBaseModel = map_to_model(chat_model)()
+    self.chat_model: str | AIBaseModel = map_to_price_model(chat_model)()
     self.model_id: str = (self.chat_model.id
                           if isinstance(self.chat_model, AIBaseModel)
                           else chat_model)
@@ -42,7 +44,8 @@ class BaseOpenAIChat(BaseAIChat):
     self.max_tokens: int = max_tokens
     self.headers: Dict[str, str] = headers or self._generate_default_headers()
     self.stream: bool = stream
-    self.stream_options: Optional[Dict[str, Any]] = stream_options
+    self.stream_options: Optional[Dict[str, Any]] = ({"include_usage": True}
+                                                     if stream else None)
     self.response_format: Optional[Dict[str, Any]] = response_format
     self.seed: Optional[int] = seed
     self.endpoint: str = endpoint
@@ -53,6 +56,10 @@ class BaseOpenAIChat(BaseAIChat):
                   messages: List[ChatMessage],
                   sys_prompt: str = None) -> ChatResponse:
     """Sends a synchronous prompt to the OpenAI API Chat endpoint."""
+    if self.stream:
+       raise Exception("Streaming not supported for synchronous requests. "
+                       "Set `stream=False` to use this method.")
+
     request = self._prepare_request(messages=messages, sys_prompt=sys_prompt)
     try:
       response = session.post(
@@ -63,18 +70,16 @@ class BaseOpenAIChat(BaseAIChat):
       # Check response status and send results back to user
       response.raise_for_status()
       result = self._prepare_response(response.json())
-
       return result
     except (HTTPError, Timeout, RequestException) as ex:
       print(f"Request failed with error: {response.text}")
-      print(f"Request type: {type(request)}\nRequest: {request}")
       raise ex
     except Exception as ex:
-      print(f"An unexpected error occurred: {str(ex)}")
+      print(f"An unexpected error occurred: {response.text}")
       raise ex
 
   async def async_send_prompt(self,
-                        session: ClientSession,
+                        session: aiohttp.ClientSession,
                         messages: List[ChatMessage],
                         sys_prompt: str = None) -> ChatResponse:
     """Sends a prompt to the OpenAI API asynchronously and returns the response."""
@@ -92,13 +97,39 @@ class BaseOpenAIChat(BaseAIChat):
     except (aiohttp.ClientResponseError, aiohttp.ClientTimeout, aiohttp.ClientError) as ex:
       error_msg = await response.text()
       print(f"Request failed with error: {error_msg}")
-      print(f"Request type: {type(request)}\nRequest: {request}")
       raise ex
-    
     except Exception as ex:
       print(f"An unexpected exception occurred: {str(ex)}")
       raise ex
-    
+  
+  def stream_prompt(self,
+                    session: requests.Session,
+                    messages: List[ChatMessage],
+                    sys_prompt: str = None):
+    """Streams the response from the OpenAI API Chat endpoint."""
+    request = self._prepare_request(messages=messages, sys_prompt=sys_prompt)
+    try:
+      response = session.post(
+        self.endpoint,
+        headers=self.headers,
+        data=request
+      )
+      # Check response status and send results back to user
+      response.raise_for_status()
+      for line in response.iter_lines():
+        if line:
+          try:
+            result = json.loads(line.decode("utf-8").replace("data: ", ""))
+            yield result
+          except TypeError as type_err:
+            continue
+    except (HTTPError, Timeout, RequestException) as ex:
+      pass
+      # print(f"Request failed with error: {response.text}")
+    except Exception as ex:
+      pass
+      # print(f"An unexpected error occurred: {response.text}")
+
   def _prepare_request(self, messages: List[ChatMessage], sys_prompt: str = None):
     """Prepare the request to the OpenAI API."""
     # Configure output format
@@ -117,7 +148,9 @@ class BaseOpenAIChat(BaseAIChat):
       top_p=self.top_p,
       response_format=output_format,
       seed=self.seed,
-      logprobs=self.logprobs
+      logprobs=self.logprobs,
+      stream=self.stream,
+      stream_options=self.stream_options
     ).model_dump_json()
 
     return request
@@ -125,7 +158,7 @@ class BaseOpenAIChat(BaseAIChat):
   def _prepare_response(self, response: Dict[str, Any]) -> ChatResponse:
     """Prepare the response from the OpenAI API."""
     chat_response = response["choices"][0]["message"]["content"]
-    usage = response["usage"]
+    usage = response.get("usage", {})
     if issubclass(self._check_output_format(), BaseModel):
       chat_response = self.response_format.parse_raw(chat_response)
 
@@ -192,12 +225,11 @@ class BaseOpenAIChat(BaseAIChat):
 
 class OpenAIChat(ChatManager, BaseOpenAIChat):
 
-  def __init__(self, 
+  def __init__(self,
                chat_model: AIBaseModel | str = GPT4oMini,
                api_key: str = None,
                endpoint: str = "https://api.openai.com/v1/chat/completions",
                stream: bool = False,
-               stream_options: Dict[str, Any] = None,
                system_prompt: str = "You are a helpful assistant",
                response_format: Optional[Dict[str, Any] | BaseModel] = None,
                temperature: float = 0.0,
@@ -206,12 +238,11 @@ class OpenAIChat(ChatManager, BaseOpenAIChat):
                seed: int = None,
                max_tokens: int = None,
                headers: Dict[str, str] = None):
-    
+
     BaseOpenAIChat.__init__(self, chat_model=chat_model,
                               api_key=api_key,
                               endpoint=endpoint,
                               stream=stream,
-                              stream_options=stream_options,
                               system_prompt=system_prompt,
                               response_format=response_format,
                               temperature=temperature,
@@ -222,14 +253,22 @@ class OpenAIChat(ChatManager, BaseOpenAIChat):
                               headers=headers)
     ChatManager.__init__(self, llm=self)
 
+  def stream_chat(self, messages: List[ChatMessage] | Dict[str, Any] | str):
+    if not isinstance(messages, list):
+      messages = [ChatMessage(role="user", content=messages)]
+
+    if self.session is None:
+      self.session = requests.Session()
+
+    return self.stream_prompt(self.session, messages, self.system_prompt)
+
 
 class SimpleOpenAIChatbot(OpenAIChat):
-  def __init__(self, 
+  def __init__(self,
                chat_model: AIBaseModel | str = GPT4oMini,
                api_key: str = None,
                endpoint: str = "https://api.openai.com/v1/chat/completions",
                stream: bool = False,
-               stream_options: Dict[str, Any] = None,
                system_prompt: str = "You are a helpful assistant",
                response_format: Optional[Dict[str, Any] | BaseModel] = None,
                temperature: float = 0.0,
@@ -239,11 +278,11 @@ class SimpleOpenAIChatbot(OpenAIChat):
                max_tokens: int = None,
                headers: Dict[str, str] = None,
                message_buffer_size: int = 5):
+
     super().__init__(chat_model=chat_model,
                     api_key=api_key,
                     endpoint=endpoint,
                     stream=stream,
-                    stream_options=stream_options,
                     system_prompt=system_prompt,
                     response_format=response_format,
                     temperature=temperature,
@@ -252,25 +291,40 @@ class SimpleOpenAIChatbot(OpenAIChat):
                     seed=seed,
                     max_tokens=max_tokens,
                     headers=headers)
-    
+
     self.message_history = [
-        ChatMessage(role="system", 
-                    content=system_prompt or self.system_prompt)
+        ChatMessage(role="system", content=system_prompt or self.system_prompt)
     ]
     self.MESSAGE_BUFFER_SIZE = message_buffer_size
+    summary_prompt = ("Create a one or two paragraph summary of the given "
+                      "chat history so that we can understand the conversation")
+    self.summarizer = OpenAIChat(chat_model=chat_model,
+                                 system_prompt=summary_prompt)
+    self.usage = {}
+  
+  def _tally_total_cost(self, current_usage: Dict[str, float]):
+    """Tally the total cost the current conversation."""
+    current_cost = self.usage
+    for item in current_usage:
+      if item in current_cost:
+        current_cost[item] += current_usage[item]
+        continue
+      current_cost[item] = current_usage[item]
+    self.usage = current_cost 
 
   def _simple_message_compaction(self):
-      print("Compacting messages...")
-      raw_messages = [m.content for m in self.message_history]
-      summary = self.chat("Summarize the following conversation in one to "
-                            f"two paragraphs:\n\n{raw_messages}")
-      compacted_history = [
-          self.message_history[0], 
-          ChatMessage(role = "assistant", content=summary.response)]
-      print("Compaction completed!")
-      self.message_history = compacted_history
+      """Compacts message history once the MESSAGE_BUFFER_SIZE is reached."""
+      try:
+        summary = self.summarizer.chat(self.message_history)
+        compacted_history = [
+            self.message_history[0],
+            ChatMessage(role = "assistant", content=summary.response)]
+        self.message_history = compacted_history
+      except Exception as ex:
+        print(f"An unexpected exception occurred during compaction: {str(ex)}")
 
   def conversation(self):
+      """Starts a conversation loop with the user."""
       while True:
         with self as llm:
           question = input("Ask me anything!\t")
@@ -282,7 +336,32 @@ class SimpleOpenAIChatbot(OpenAIChat):
             self._simple_message_compaction()
 
           self.message_history.append(format_for_chat(question))
-          result = llm.chat(self.message_history)
-          print(result.response, end=f"\n\n{'-' * 40}\n\n")
-          self.message_history.append(ChatMessage(role="assistant", 
-                                          content=result.response))
+          # Handle streaming messages
+          if self.stream:
+            token_buffer = StringIO()
+            usage = {}
+            for elem in llm.stream_chat(self.message_history):
+              if elem:
+                if elem.get("usage"):
+                  usage = elem["usage"]
+                  continue
+                token = elem["choices"][0]["delta"].get("content", "")
+                token_buffer.write(token)
+                print(token, end="")
+                time.sleep(0.025)
+            # Add cost to usage if cost model is available
+            if isinstance(self.chat_model, AIBaseModel):
+              cost =  self._calculate_cost(usage)
+              usage = {**usage, **cost}
+            self._tally_total_cost(usage)
+            response = ChatResponse(model=self.model_id, 
+                                  usage=usage, 
+                                  response=token_buffer.getvalue())
+          else:
+            # Handle non-streaming messages
+            response = llm.chat(self.message_history)
+            print(response.response)
+            self._tally_total_cost(response.usage)
+          self.message_history.append(ChatMessage(role="assistant",
+                                                  content=response.response))
+          print("\n\n--------------------------------------------")

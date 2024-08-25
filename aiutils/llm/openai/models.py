@@ -121,8 +121,10 @@ OPENAI_MODEL_MAP = {
     "gpt-3.5-turbo-16k-0613": GPT35Turbo16k
 }
 
-def map_to_model(model_name: str|AIBaseModel) -> AIBaseModel:
-  """Maps a model name to a model object."""
-  if model_name not in OPENAI_MODEL_MAP and isinstance(model_name, str):
-    print(f"Cost tracking not available for {model_name}")
-  return OPENAI_MODEL_MAP.get(model_name, model_name)
+def map_to_price_model(model: str|AIBaseModel) -> AIBaseModel:
+  """Maps a model name to a model object to obtain pricing information"""
+  if isinstance(model, str):
+    if model not in OPENAI_MODEL_MAP:
+      print(f"Cost tracking not available for {model}")
+    return OPENAI_MODEL_MAP.get(model, model)
+  return model
