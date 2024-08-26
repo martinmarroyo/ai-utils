@@ -5,8 +5,13 @@ import json
 
 def validate_chat_input(content: str | Dict[str, Any] | BaseModel) -> str:
   """Converts the chat input to JSON to send as a POST request"""
-  if isinstance(content, BaseModel):
+  if hasattr(content, "model_dump_json"):
     return content.model_dump_json()
+  if isinstance(content, dict):
+    # Find any model types in dictionary inputs and convert to json
+    for k, v in content.items():
+      if hasattr(v, "model_dump_json"):
+        content[k] = v.model_dump_json()
   return json.dumps(content)
 
 ChatInput = Annotated[
