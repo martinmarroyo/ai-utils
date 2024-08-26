@@ -26,6 +26,7 @@ class BaseOpenAIChat(BaseAIChat):
                endpoint: str = "https://api.openai.com/v1/chat/completions",
                stream: bool = False,
                system_prompt: str = "You are a helpful assistant",
+               prompt_template: str = None,
                response_format: Optional[Dict[str, Any] | BaseModel] = None,
                temperature: float = 0.0,
                logprobs: bool = False,
@@ -39,6 +40,7 @@ class BaseOpenAIChat(BaseAIChat):
                           if isinstance(self.chat_model, AIBaseModel)
                           else chat_model)
     self.system_prompt: str = system_prompt
+    self.prompt_template: str = prompt_template
     self.temperature: float = temperature
     self.top_p: float = top_p
     self.max_tokens: int = max_tokens
@@ -130,13 +132,30 @@ class BaseOpenAIChat(BaseAIChat):
       pass
       # print(f"An unexpected error occurred: {response.text}")
 
+  def _apply_prompt_template(self, messages: List[ChatMessage]):
+    """Apply the prompt template to the messages."""
+    for message in messages:
+      if message.role in ("user", "human"):
+        try:
+          message.content = self.prompt_template.format(
+                            **json.loads(message.content))
+        except Exception:
+          raise ValueError(
+              f"Input: {message.content} does not match provided "
+              "prompt template.")
+        
   def _prepare_request(self, messages: List[ChatMessage], sys_prompt: str = None):
     """Prepare the request to the OpenAI API."""
-    # Configure output format
+    # Apply prompt template to messages if provided. Raise error if input format
+    # does not match the supplied template
+    if self.prompt_template:
+      self._apply_prompt_template(messages)
+
+    # Configure output format for the LLM response
     output_format = self.response_format
     if issubclass(self._check_output_format(), BaseModel):
         output_format = self._structure_model_schema()
-    # Set up and send a synchronous request
+    # Set up a request for the chat completions API
     request = OpenAIChatRequest(
       model=self.model_id,
       messages=[
@@ -231,6 +250,7 @@ class OpenAIChat(ChatManager, BaseOpenAIChat):
                endpoint: str = "https://api.openai.com/v1/chat/completions",
                stream: bool = False,
                system_prompt: str = "You are a helpful assistant",
+               prompt_template: str = None,
                response_format: Optional[Dict[str, Any] | BaseModel] = None,
                temperature: float = 0.0,
                logprobs: bool = False,
@@ -244,6 +264,7 @@ class OpenAIChat(ChatManager, BaseOpenAIChat):
                               endpoint=endpoint,
                               stream=stream,
                               system_prompt=system_prompt,
+                              prompt_template=prompt_template,
                               response_format=response_format,
                               temperature=temperature,
                               logprobs=logprobs,
@@ -270,6 +291,7 @@ class SimpleOpenAIChatbot(OpenAIChat):
                endpoint: str = "https://api.openai.com/v1/chat/completions",
                stream: bool = False,
                system_prompt: str = "You are a helpful assistant",
+               prompt_template: str = None,
                response_format: Optional[Dict[str, Any] | BaseModel] = None,
                temperature: float = 0.0,
                logprobs: bool = False,
@@ -296,6 +318,7 @@ class SimpleOpenAIChatbot(OpenAIChat):
         ChatMessage(role="system", content=system_prompt or self.system_prompt)
     ]
     self.MESSAGE_BUFFER_SIZE = message_buffer_size
+    self.chat_prompt_template = prompt_template
     summary_prompt = ("Create a one or two paragraph summary of the given "
                       "chat history so that we can understand the conversation")
     self.summarizer = OpenAIChat(chat_model=chat_model,
@@ -335,6 +358,12 @@ class SimpleOpenAIChatbot(OpenAIChat):
           if len(self.message_history) >= self.MESSAGE_BUFFER_SIZE:
             self._simple_message_compaction()
 
+          if self.chat_prompt_template:
+            try:
+              question = self.chat_prompt_template.format(content=question)
+            except KeyError:
+              question = f"{self.chat_prompt_template}\n{question}"
+              
           self.message_history.append(format_for_chat(question))
           # Handle streaming messages
           if self.stream:
