@@ -32,13 +32,19 @@ class ChatManager:
   def __exit__(self, exc_type, exc_value, traceback):
     self._session.close()
 
-  def chat(self, messages: List[ChatMessage] | Dict[str, Any] | str):
+  def chat(self, messages: List[ChatMessage] | 
+                           ChatMessage | 
+                           Dict[str, Any] | 
+                           str):
       """Synchronous chat with the given LLM"""
       if not self._session:
         self._session = Session()
 
       if not isinstance(messages, list):
-        messages = [ChatMessage(role="user", content=messages)]
+        if isinstance(messages, ChatMessage):
+          messages = [messages]
+        else:
+          messages = [ChatMessage(role="user", content=messages)]
 
       retries = 0
       penalty_wait = 0
@@ -65,13 +71,19 @@ class ChatManager:
   async def __aexit__(self, exc_type, exc_value, traceback):
     await self._async_session.close()
   
-  async def async_chat(self, messages: List[ChatMessage] | Dict[str, Any] | str):
+  async def async_chat(self, messages: List[ChatMessage] | 
+                                       ChatMessage | 
+                                       Dict[str, Any] | 
+                                       str):
       """Asynchronous chat with the given LLM"""
       if not self._async_session:
         self._async_session = ClientSession()
 
       if not isinstance(messages, list):
-        messages = [ChatMessage(role="user", content=messages)]
+        if isinstance(messages, ChatMessage):
+          messages = [messages]
+        else:
+          messages = [ChatMessage(role="user", content=messages)]
 
       retries = 0
       penalty_wait = 0

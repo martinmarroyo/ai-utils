@@ -6,7 +6,7 @@ from aiutils.llm.base.messages import ChatMessage
 from aiutils.llm.base.managers import ChatManager
 from aiutils.llm.openai.models import OpenAIChatRequest
 from aiutils.llm.openai.models import GPT4oMini
-from aiutils.llm.openai.models import map_to_price_model
+from aiutils.llm.openai.models import map_to_model
 from requests.exceptions import HTTPError, Timeout, RequestException
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, Literal
@@ -17,6 +17,7 @@ import json
 import time
 import requests
 import aiohttp
+import base64
 
 class BaseOpenAIChat(BaseAIChat):
   """A class for interacting with the OpenAI Chat API."""
@@ -35,10 +36,8 @@ class BaseOpenAIChat(BaseAIChat):
                max_tokens: int = None,
                headers: Dict[str, str] = None):
     self.api_key: str = os.environ.get("OPENAI_API_KEY", api_key)
-    self.chat_model: str | AIBaseModel = map_to_price_model(chat_model)()
-    self.model_id: str = (self.chat_model.id
-                          if isinstance(self.chat_model, AIBaseModel)
-                          else chat_model)
+    self.chat_model: str | AIBaseModel = map_to_model(chat_model)
+    self.model_id: str = self.chat_model.id
     self.system_prompt: str = system_prompt
     self.prompt_template: str = prompt_template
     self.temperature: float = temperature
@@ -227,8 +226,8 @@ class BaseOpenAIChat(BaseAIChat):
 
   def _calculate_cost(self, usage: Dict[str, int]) -> Dict[str, float]:
     """Calculate the cost of the request."""
-    input_cost = usage["prompt_tokens"] * self.chat_model.input_token_price
-    output_cost = usage["completion_tokens"] * self.chat_model.output_token_price
+    input_cost = usage.get("prompt_tokens", 0) * self.chat_model.input_token_price
+    output_cost = usage.get("completion_tokens", 0) * self.chat_model.output_token_price
     total_cost = input_cost + output_cost
     return dict(input_cost_usd=input_cost,
                 output_cost_usd=output_cost,
@@ -401,3 +400,24 @@ class SimpleOpenAIChatbot(OpenAIChat):
           self.message_history.append(ChatMessage(role="assistant",
                                                   content=response.response))
           print("\n\n--------------------------------------------")
+
+
+def create_image_url_from_file(filepath: str):
+  # Check that filepath exists
+  assert os.path.exists(filepath), f"{filepath} does not exist"
+  # Open file from path
+  with open(filepath, "rb") as f:
+    # Read and b64 encode file
+    image_file = base64.b64encode(f.read()).decode('utf-8')
+  # Create the image_url
+  image_url = f"data:image/jpeg;base64,{image_file}"
+  return image_url
+
+def create_chat_message_with_images(text: str, image_url: str | List[str]):
+  """Creates a chat message that includes both text and one or more images."""
+  text_format = {"type": "text", "text": text}
+  if isinstance(image_url, str):
+    image_url = [image_url]
+  image_format = [{"type": "image_url", "image_url": {"url": img}} for img in image_url]
+  content = [text_format] + image_format
+  return ChatMessage(role="user", content=json.dumps(content))
