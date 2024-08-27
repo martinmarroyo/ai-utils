@@ -208,8 +208,13 @@ class BaseOpenAIChat(BaseAIChat):
         "additionalProperties": False,
         "required": list(self.response_format.model_fields.keys())
     }
-    if "$defs" in schema:
-      schema["schema"].update({"$defs": schema.pop("$defs")})
+    inner_models = schema.get("$defs", {}) 
+    for model in inner_models:
+      inner_models[model]["additionalProperties"] = False
+      inner_models[model]["required"] = list(
+          inner_models[model]["properties"].keys())
+    schema["schema"].update({"$defs": schema.pop("$defs"),
+                               "additionalProperties": False,})
     schema["strict"] = True
     if schema.get("required"):
       del schema["required"]
