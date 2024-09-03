@@ -97,13 +97,11 @@ class BaseOpenAIChat(BaseAIChat):
       result = self._prepare_response(await response.json())
       return result
 
-    except (aiohttp.ClientResponseError, aiohttp.ClientTimeout, aiohttp.ClientError) as ex:
+    except Exception as ex:
       error_msg = await response.text()
       print(f"Request failed with error: {error_msg}")
       raise ex
-    except Exception as ex:
-      print(f"An unexpected exception occurred: {str(ex)}")
-      raise ex
+
   
   def stream_prompt(self,
                     session: requests.Session,
