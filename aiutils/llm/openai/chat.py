@@ -86,13 +86,13 @@ class BaseOpenAIChat(BaseAIChat):
                         messages: List[ChatMessage],
                         sys_prompt: str = None) -> ChatResponse:
     """Sends a prompt to the OpenAI API asynchronously and returns the response."""
-    try:
-      request = self._prepare_request(messages=messages, sys_prompt=sys_prompt)
-      response = await session.post(
+    request = self._prepare_request(messages=messages, sys_prompt=sys_prompt)
+    response = await session.post(
         self.endpoint,
         headers=self.headers,
         data=request
-      )
+    )
+    try: 
       response.raise_for_status()
       result = self._prepare_response(await response.json())
       return result
