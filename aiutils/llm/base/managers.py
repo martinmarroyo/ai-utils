@@ -91,7 +91,7 @@ class ChatManager:
         try:
           response = await self.llm.async_send_prompt(self._async_session, messages)
           return response
-        except (ClientResponseError, ClientTimeout, ClientError) as ex:
+        except Exception as ex:
           retries += 1
           if retries == self._max_retries:
             print("Retries exhausted. Please check your rate limits "
