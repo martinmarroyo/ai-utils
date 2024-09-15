@@ -36,7 +36,8 @@ class BaseOpenAIChat(BaseAIChat):
                top_p: float = None,
                seed: int = None,
                max_tokens: int = None,
-               headers: Dict[str, str] = None):
+               headers: Dict[str, str] = None,
+               cost_tracking: bool = True):
     self.api_key: str = os.environ.get("OPENAI_API_KEY", api_key)
     self.chat_model: str | AIBaseModel = map_to_model(chat_model)
     self.model_id: str = self.chat_model.id
@@ -53,6 +54,10 @@ class BaseOpenAIChat(BaseAIChat):
     self.seed: Optional[int] = seed
     self.endpoint: str = endpoint
     self.logprobs: bool = logprobs
+    self.cost_tracking_enabled = cost_tracking
+    self.input_cost_usd = 0.0 if self.cost_tracking_enabled else None
+    self.output_cost_usd = 0.0 if self.cost_tracking_enabled else None
+    self.total_cost_usd = 0.0 if self.cost_tracking_enabled else None
 
   def send_prompt(self,
                   session: requests.Session,
@@ -229,6 +234,11 @@ class BaseOpenAIChat(BaseAIChat):
     input_cost = usage.get("prompt_tokens", 0) * self.chat_model.input_token_price
     output_cost = usage.get("completion_tokens", 0) * self.chat_model.output_token_price
     total_cost = input_cost + output_cost
+    if self.cost_tracking_enabled:
+      self.input_cost_usd += input_cost
+      self.output_cost_usd += output_cost
+      self.total_cost_usd += total_cost
+      
     return dict(input_cost_usd=input_cost,
                 output_cost_usd=output_cost,
                 total_cost_usd=total_cost)
