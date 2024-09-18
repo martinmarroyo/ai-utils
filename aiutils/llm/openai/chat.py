@@ -182,9 +182,10 @@ class BaseOpenAIChat(BaseAIChat):
     """Prepare the response from the OpenAI API."""
     chat_response = response["choices"][0]["message"]["content"]
     usage = response.get("usage", {})
-    for key in usage:
-      if key not in ("prompt_tokens", "completion_tokens", "total_tokens"):
-        del usage[key]
+    try:
+      del usage["completion_tokens_details"]
+    except Exception:
+      print("No extra keys to remove.")
     if issubclass(self._check_output_format(), BaseModel):
       chat_response = self.response_format.parse_raw(chat_response)
 
