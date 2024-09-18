@@ -183,8 +183,8 @@ class BaseOpenAIChat(BaseAIChat):
     chat_response = response["choices"][0]["message"]["content"]
     usage = response.get("usage", {})
     for key in usage:
-      if key not in ("prompt_tokens", "completion_tokens", "total_tokens")
-      del usage[key]
+      if key not in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        del usage[key]
     if issubclass(self._check_output_format(), BaseModel):
       chat_response = self.response_format.parse_raw(chat_response)
 
