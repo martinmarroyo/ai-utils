@@ -182,6 +182,9 @@ class BaseOpenAIChat(BaseAIChat):
     """Prepare the response from the OpenAI API."""
     chat_response = response["choices"][0]["message"]["content"]
     usage = response.get("usage", {})
+    for key in usage:
+      if key not in ("prompt_tokens", "completion_tokens", "total_tokens")
+      del usage[key]
     if issubclass(self._check_output_format(), BaseModel):
       chat_response = self.response_format.parse_raw(chat_response)
 
@@ -231,8 +234,8 @@ class BaseOpenAIChat(BaseAIChat):
 
   def _calculate_cost(self, usage: Dict[str, int]) -> Dict[str, float]:
     """Calculate the cost of the request."""
-    input_cost = usage.get("prompt_tokens", 0) * self.chat_model.input_token_price
-    output_cost = usage.get("completion_tokens", 0) * self.chat_model.output_token_price
+    input_cost = usage.get("prompt_tokens", 0.0) * self.chat_model.input_token_price
+    output_cost = usage.get("completion_tokens", 0.0) * self.chat_model.output_token_price
     total_cost = input_cost + output_cost
     if self.cost_tracking_enabled:
       self.input_cost_usd += input_cost
